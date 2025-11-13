@@ -53,7 +53,7 @@ last_ai_reply = None
 AEC_FILTER_LEN = 2048
 AEC_LEARNING_RATE = 0.4
 AEC_EPS = 1e-8
-ace_weights = np.zeros(AEC_FILTER_LEN, dtype=np.float32)
+aec_weights = np.zeros(AEC_FILTER_LEN, dtype=np.float32)
 playback_ringbuffer = collections.deque(maxlen= AEC_FILTER_LEN * 4)
 
 # VAD state for thresholds
@@ -87,11 +87,26 @@ def aec_process(mic_chunk: np.ndarray) -> np.ndarray:
     x = np.array(list(playback_ringbuffer)[-AEC_FILTER_LEN:], dtype=np.float32)
     d = mic_chunk.astype(np.float32)
 
-    y = np.convolve(x[::1], aec_weights, mode = "valid")[:len(d)]
+    y = np.dot(aec_weights, x[-AEC_FILTER_LEN:][:len(aec_weights)])
+    y = np.full_like(d,y)
+
+    # y = np.convolve(x[::1], aec_weights, mode = "valid")[:len(d)]
     e = d-y
 
     norm_x = np.dot(x,x)+ AEC_EPS
-    aec_weights += (AEC_LEARNING_RATE / norm_x) * np.convolve(e, x[::-1], mode="valid")[:len(aec_weights)]
+    update = (AEC_LEARNING_RATE / norm_x) * e.name() * x
+    if len(update) != len(aec_weights):
+        update = np.resize(update, len(aec_weights))
+    
+    aec_weights += update
+
+    #for debugging purpose
+    rms_before = np.sqrt(np.mean(d * 2))
+    rms_after = np.sqrt(np.mean(e ** 2))
+    if rms_before > 0:
+        reduction_db = 20 * np.log10(rms_after / (rms_before + 1e-8))
+        print(f"AEC Redustion: {reduction_db: .2f} db")
+
     return e
 # ===================== AUDIO OUTPUT INIT =====================
 pygame.mixer.init()
@@ -119,12 +134,6 @@ print("Listening for speech...")
 def speak_text(text):
     global is_playing_ai, interrupted_audio_data, interrupted_pos
 
-    audio_segment = AudioSegment.from_file(io.BytesIO(interrupted_audio_data), format="mp3")
-    audio_segment = audio_segment.set_frame_rate(SAMPLE_RATE).set_channels(1)
-    pcm_data = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-
-    aec_feed_playback(pcm_data)
-
     """Convert text to speech and play it, allowing interruption & safe resuming."""
     try:
         tts = gTTS(text=text, lang="en")
@@ -137,7 +146,17 @@ def speak_text(text):
         interrupted_pos = 0
         is_playing_ai = True
 
-        pygame.mixer.music.load(io.BytesIO(interrupted_audio_data), "mp3")
+        try: 
+            pcm_buf = io.BytesIO(interrupted_audio_data)
+            audio_segment = AudioSegment.from_file(pcm_buf, format="mp3")
+            audio_segment = audio_segment.set_frame_rate(SAMPLE_RATE).set_channels(1)
+            pcm_data = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
+            aec_feed_playback(pcm_data)
+        except:
+            print("AEC decode skipped (pydub/ffmpeg error):", e)
+
+        play_buf = io.BytesIO(interrupted_audio_data)
+        pygame.mixer.music.load(play_buf, "mp3")
         pygame.mixer.music.play()
 
         while pygame.mixer.music.get_busy():
