@@ -8,7 +8,9 @@ import requests
 from gtts import gTTS
 import pygame
 import io
- 
+import collections
+from pydub import AudioSegment
+
 # ===================== CONFIG =====================
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -47,6 +49,13 @@ last_transcription_time = 0.0
 last_user_text = ""
 last_ai_reply = None
 
+# Echo Canceller state
+AEC_FILTER_LEN = 2048
+AEC_LEARNING_RATE = 0.4
+AEC_EPS = 1e-8
+ace_weights = np.zeros(AEC_FILTER_LEN, dtype=np.float32)
+playback_ringbuffer = collections.deque(maxlen= AEC_FILTER_LEN * 4)
+
 # VAD state for thresholds
 speech_frame_counter = 0
 
@@ -64,6 +73,26 @@ last_speech_time = time.time()
 speech_buffer = np.zeros(0, dtype=np.float32)
 segment_index = 0
 
+# ==================== ECHO CANCELLATION =========================
+def aec_feed_playback(play_chunk: np.ndarray):
+    playback_ringbuffer.extend(play_chunk.tolist())
+
+def aec_process(mic_chunk: np.ndarray) -> np.ndarray:
+    # Addaptive Echo cancellation using NLMS Algorithm.
+    global aec_weights
+
+    if len(playback_ringbuffer) < AEC_FILTER_LEN:
+        return mic_chunk
+    
+    x = np.array(list(playback_ringbuffer)[-AEC_FILTER_LEN:], dtype=np.float32)
+    d = mic_chunk.astype(np.float32)
+
+    y = np.convolve(x[::1], aec_weights, mode = "valid")[:len(d)]
+    e = d-y
+
+    norm_x = np.dot(x,x)+ AEC_EPS
+    aec_weights += (AEC_LEARNING_RATE / norm_x) * np.convolve(e, x[::-1], mode="valid")[:len(aec_weights)]
+    return e
 # ===================== AUDIO OUTPUT INIT =====================
 pygame.mixer.init()
 
@@ -84,10 +113,19 @@ stream = sd.InputStream(
 stream.start()
 print("Listening for speech...")
 
+
+
 # ===================== TTS (Speak Function) =====================
 def speak_text(text):
-    """Convert text to speech and play it, allowing interruption & safe resuming."""
     global is_playing_ai, interrupted_audio_data, interrupted_pos
+
+    audio_segment = AudioSegment.from_file(io.BytesIO(interrupted_audio_data), format="mp3")
+    audio_segment = audio_segment.set_frame_rate(SAMPLE_RATE).set_channels(1)
+    pcm_data = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
+
+    aec_feed_playback(pcm_data)
+
+    """Convert text to speech and play it, allowing interruption & safe resuming."""
     try:
         tts = gTTS(text=text, lang="en")
         mp3_fp = io.BytesIO()
@@ -229,6 +267,8 @@ def listener_loop():
     while True:
         if not audio_q.empty():
             chunk = audio_q.get().flatten()
+            chunk = aec_process(chunk)  # Apply echo cancellation before VAD
+
             #added code fro recognising self voice
             if is_playing_ai and interrupted_audio_data is not None:
                 try:
