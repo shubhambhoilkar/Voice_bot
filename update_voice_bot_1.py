@@ -78,34 +78,40 @@ def aec_feed_playback(play_chunk: np.ndarray):
     playback_ringbuffer.extend(play_chunk.tolist())
 
 def aec_process(mic_chunk: np.ndarray) -> np.ndarray:
-    # Addaptive Echo cancellation using NLMS Algorithm.
+    """Adaptive echo cancellation using chunk-based NLMS (safe, delay-tolerant)."""
     global aec_weights
 
+    # Skip AEC if insufficient playback history
     if len(playback_ringbuffer) < AEC_FILTER_LEN:
         return mic_chunk
-    
+
+    # Fetch latest playback reference
     x = np.array(list(playback_ringbuffer)[-AEC_FILTER_LEN:], dtype=np.float32)
     d = mic_chunk.astype(np.float32)
 
-    y = np.dot(aec_weights, x[-AEC_FILTER_LEN:][:len(aec_weights)])
-    y = np.full_like(d,y)
+    # Predict echo (estimated playback contribution)
+    y_est = np.dot(aec_weights, x[-len(aec_weights):])
+    y = np.full_like(d, y_est)
 
-    # y = np.convolve(x[::1], aec_weights, mode = "valid")[:len(d)]
-    e = d-y
+    # Compute residual error (mic - estimated echo)
+    e = d - y
 
-    norm_x = np.dot(x,x)+ AEC_EPS
-    update = (AEC_LEARNING_RATE / norm_x) * e.name() * x
+    # Adaptive NLMS update (chunk-based averaging for stability)
+    norm_x = np.dot(x, x) + AEC_EPS
+    update = (AEC_LEARNING_RATE / norm_x) * e.mean() * x
+
+    # Match update shape to filter
     if len(update) != len(aec_weights):
         update = np.resize(update, len(aec_weights))
-    
+
     aec_weights += update
 
-    #for debugging purpose
-    rms_before = np.sqrt(np.mean(d * 2))
+    # Optional: debug print echo reduction in dB
+    rms_before = np.sqrt(np.mean(d ** 2))
     rms_after = np.sqrt(np.mean(e ** 2))
     if rms_before > 0:
         reduction_db = 20 * np.log10(rms_after / (rms_before + 1e-8))
-        print(f"AEC Redustion: {reduction_db: .2f} db")
+        print(f"AEC echo reduction ≈ {reduction_db:.2f} dB")
 
     return e
 # ===================== AUDIO OUTPUT INIT =====================
