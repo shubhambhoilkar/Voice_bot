@@ -3,7 +3,8 @@ Simple offiline Voice Bot using openai for LLM
 
 Workflow for Voice Bot:
 
-#code
+# code workflow
+```bash
 Microphone → VAD → buffer speech → silence detected?
                  ↳ no → keep listening
                  ↳ yes → Whisper → transcript text
@@ -16,3 +17,4 @@ Microphone → VAD → buffer speech → silence detected?
       ↘ if user speaks (VAD detects)
          stop playback (barge-in)
          ↳ after silence → resume playback
+```
