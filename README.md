@@ -1,4 +1,4 @@
-** 🎙️ AI Voice Bot — Real-Time Speech Interaction with Whisper + TTS + Echo Cancellation **
+* 🎙️ AI Voice Bot — Real-Time Speech Interaction with Whisper + TTS + Echo Cancellation *
 
   - A production-grade real-time voice assistant built using:
   - Whisper (Faster-Whisper) for speech-to-text
@@ -8,7 +8,7 @@
   - Silero VAD for robust voice activity detection
   - Interruption support (user can talk over the AI and it will pause/resume)
 
-* 📌 Key Features *
+# 📌 Key Features 
 # 🔊 1. Real-time streaming speech-to-text
 
 Continuous audio capture from microphone, processed in small blocks with Silero VAD and Whisper.
