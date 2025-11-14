@@ -1,4 +1,4 @@
-* 🎙️ AI Voice Bot — Real-Time Speech Interaction with Whisper + TTS + Echo Cancellation *
+# 🎙️ AI Voice Bot — Real-Time Speech Interaction with Whisper + TTS + Echo Cancellation 
 
   - A production-grade real-time voice assistant built using:
   - Whisper (Faster-Whisper) for speech-to-text
@@ -8,7 +8,7 @@
   - Silero VAD for robust voice activity detection
   - Interruption support (user can talk over the AI and it will pause/resume)
 
-# 📌 Key Features 
+* 📌 Key Features 
 # 🔊 1. Real-time streaming speech-to-text
 
 Continuous audio capture from microphone, processed in small blocks with Silero VAD and Whisper.
@@ -50,7 +50,7 @@ VAD → Whisper → API → TTS → Playback → Echo Cancellation → VAD → .
 └── requirements.txt         # Recommended dependencies
 
 ```
-# Key Components Inside the Script
+* Key Components Inside the Script
 audio_callback():  	
 Captures small audio frames from mic
 
@@ -75,7 +75,7 @@ Feeds speaker PCM into reference ringbuffer
 # ⚙️ System Workflow
 Below is the complete path of audio and data through the system.
 
-# 1️⃣ Audio Capture → VAD → Speech Buffering
+* 1️⃣ Audio Capture → VAD → Speech Buffering
 
  - Microphone audio (16 kHz, mono) streams in as small blocks (512 samples).
  - Each chunk is preprocessed by echo cancellation (explained later).
@@ -85,7 +85,7 @@ Results:
  - Continuous user speech is merged into a "speech buffer".
  - Silence after speech triggers transcription.
 
-# 2️⃣ Whisper Transcription
+* 2️⃣ Whisper Transcription
 When speech ends, a final segment is sent to Faster-Whisper.
 Features:
   - Automatic confidence evaluation
@@ -96,12 +96,12 @@ Features:
     - Number of words
     - Silence timing
    
-# 4️⃣ TTS & Playback
+* 4️⃣ TTS & Playback
  - gTTS converts AI response → MP3
  - Decoded PCM is fed into echo cancellation
  - MP3 is played using pygame
 
-#Interruption support
+* Interruption support
 If VAD detects user speech while playing audio:
  - Playback pauses
  - User input is processed
