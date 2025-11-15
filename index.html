@@ -1,0 +1,178 @@
+<!DOCTYPE>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name = "viewport" content="width =device-width, initial-scale = 1" />
+        <title>Voice Bot UI</title>
+        <style>
+            body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; 
+                margin: 0; 
+                padding: 0; 
+                background:#f6f7fb; 
+            }
+            .app { max-width: 720px; 
+                margin: 32px auto; 
+                background: white; 
+                border-radius: 12px; 
+                box-shadow: 0 8px 30px rgba(30,30,60,0.06); 
+                overflow: hidden; 
+            }
+            header { padding: 16px 20px; 
+                display:flex; 
+                align-items:center; 
+                gap:12px; 
+                border-bottom:1px solid #eee; 
+            }
+            button { padding: 8px 12px; 
+                border-radius:8px; 
+                border: none; 
+                background:#2563EB; 
+                color:white; 
+                cursor:pointer; 
+            }
+            button.secondary { background:#efefef; 
+                color:#111; 
+            }
+            #status { margin-left:auto; 
+                font-size:13px; 
+                color:#555; 
+            }
+            #chat { height: 60vh; 
+                overflow:auto; 
+                padding: 16px; 
+                display:flex; 
+                flex-direction:column; 
+                gap:8px; 
+            }
+            .bubble { max-width:70%; 
+                padding:10px 14px; 
+                border-radius:12px; 
+                line-height:1.3; 
+            }
+            .user { align-self:flex-end; 
+                background:#2563EB; 
+                color:white; 
+                border-bottom-right-radius:4px; 
+            }
+            .bot { align-self:flex-start; 
+                background:#f1f5f9; 
+                color:#0b1220; 
+                border-bottom-left-radius:4px;
+            }
+            .meta { font-size:12px; 
+                color:#666; 
+                margin-top:6px;
+            }
+            footer { padding:12px 16px; 
+                border-top:1px solid #eee; 
+                display:flex; 
+                gap:8px; 
+                align-items:center; 
+            }
+            #raw { font-size:12px; 
+                color:#777; 
+                margin-left:8px; 
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <header>
+                <strong>Voice Bot(Demo) </strong>
+                <button id="connectBtn">Start Bot! </button>
+                <button id="disconnectBtn" class="secondary" disabled>Stop!</button>
+                <div id="status">idle</div>
+            </header>
+
+            <div id="chat"></div>
+
+            <footer>
+                <div id="raw">WebSocket: <span id="wsstate">disconnected</span></div>
+            </footer>
+        </div>
+
+        <script>
+            let ws;
+            const connection = document.getElementById("connectBtn");
+            const disconnectBtn = document.getElementById("disconnectBtn");
+            const statusEl = document.getElementById("status");
+            const chat = document.getElementById("chat");
+            const wsstate = document.getElementById("wsstate");
+
+            function addMessage(kind, text, meta) {
+                const el = document.createElement("div");
+                el.className = "bubble" + (kind === "user" ? "user":"bot");
+                el.innerHTML = "<div>" + escapeHTML(text) + "<div>";
+                if (meta) {
+                    const m = document.createElement("div");
+                    m.className = "meta";
+                    m.textContent = JSON.stringify(meta);
+                    el.appendChild(m);
+                }
+                chat.appendChild(el);
+                chat.scrollTop = chat.scroll(meta);
+            }
+
+            function addStatus(text) {
+                statusEl.textContent = text;
+            }
+
+            function escapeHTML(s) {
+                return s ? s.replace(/[&<>"']/g, (c)=>({'&':'&amp','<':'&lt','>':'&gt;','"':'&quot','"':'&#39;'})[c]):"";
+            }
+
+            connection.onclick = () =>{
+                if (ws && ws.readyState === WebSocket.OPEN) return;
+                const url = (location.protocol === "https:" ? "wss://":"ws://") + (location.hostname || "localhost")+ ":9900/ws";
+                ws = new WebSocket(url);
+                wsstate.textContent= "connecting";
+                ws.onopen = () => {
+                    wsstate.textContent ="connected";
+                    addStatus("connected");
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                };
+                ws.onmessage = (ev) => {
+                    try {
+                        const msg = JSON.parse(ev.data);
+                        if (msg.type === "user") {
+                            addMessage("user", msg.text, msg.meta || null);
+                            addStatus("heard user");
+                        } else if (msg.type === "bot" || msg.type === "bot_start") {
+                            addMessage("bot", msg.text, msg.meta || null);
+                            addStatus("ai speaking");
+                        } else if (msg.type === "status") {
+                            addStatus(msg.text);
+                        } else if (msg.type === "event") {
+                            addStatus("event: " + msg.text);
+                        } else if (msg.type === "warning" || ms.type === "error") {
+                            addStatus(msg.type + ": " + msg.text);
+                        } else {
+                            addMessage("bot", JSON.stringify(msg), null);
+                        }
+                    } catch (e) {
+                        console.error("Invalid ws message", e);
+                    }
+                };
+                ws.onclose = () => {
+                    wsstate.textContent = "disconnected";
+                    addStatus("disconnected");
+                    disconnectBtn = true;
+                    connectBtn.disabled = false;
+                };
+                ws.onerror = (e) => {
+                    console.error("ws err", e);
+                    addStatus("websocket error");
+                };
+            };
+
+            disconnectBtn.onclick = () => {
+                if (ws) ws.close();
+                ws = null;
+                wsstate.textContent = "disconnected";
+                addStatus.disabled = false;
+                disconnectBtn.disabled = true;
+            };
+        </script>
+    </body>
+</html>
