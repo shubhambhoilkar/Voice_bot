@@ -21,7 +21,7 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 BLOCK_SIZE = 512
 MIN_SEGMENT_SEC = 0.5
-API_URL = "localhost:/Sam_voicebot"
+API_URL = "https://stgbot.genieus4u.ai/chat/chatbot/"
 
 # Smart endpointing / merging tuning
 SPEECH_END_PADDING = 0.4
@@ -66,6 +66,7 @@ silence_frame_counter = 0
 transcription_lock = threading.Lock()
 api_lock = threading.Lock()
 playback_lock = threading.Lock()
+stop_event = threading.Event()
 
 # ===================== LOAD MODELS =====================
 print("Loading models...")
@@ -208,10 +209,8 @@ def detect_ai_voice_in_mic(mic_chunk: np.ndarray) -> tuple[bool, float]:
             corr = np.correlate(mic_normalized, ai_snippet, mode='valid')
             corr_value = float(np.max(np.abs(corr))) if len(corr) > 0 else 0.0
             
-            # ADDED: Debug print for correlation analysis
             print(f"🔍 Echo check: energy={mic_energy:.4f}, corr={corr_value:.3f}")
             
-            # Tightened conditions: Higher corr threshold for low energy, and narrower energy band for moderate
             # This reduces false positives for user speech (which may have some incidental correlation)
             if corr_value > 0.85 and mic_energy < 0.03:  # Was 0.75 and <0.05; tightened for stricter echo
                 return True, corr_value
@@ -434,7 +433,8 @@ def listener_loop():
     
     consecutive_speech_over_ai = 0  # NEW: Track sustained user speech during AI playback
     
-    while True:
+    # while True:
+    while not stop_event.is_set():
         if not audio_q.empty():
             chunk = audio_q.get().flatten()
             
@@ -575,6 +575,11 @@ def listener_loop():
         
         time.sleep(0.01)
 
+# ===================== END CALL =================
+def keyboard_listner():
+    input("Press ENTER to Stop the Voice bot...\n")
+    stop_event.set()
+
 # ===================== START =====================
 threading.Thread(target=listener_loop, daemon=True).start()
 
@@ -604,10 +609,12 @@ async def websocket_endpoint(websocket: WebSocket):
             # time.sleep(0.5)
     except Exception as e:
         print(f"Websocket error: {e}")
-    # except KeyboardInterrupt:
-    #     print("\n👋 Exiting...")
-    #     stream.stop()
-    #     stream.close()
+
+@app.post("/stop")
+def stop_bot():
+    stop_event.set()
+    return {"status": "stopping"}
+
 
 if __name__ == "__main__":
     print("Starting FastAPI Uvicorn server on port 9900...")
