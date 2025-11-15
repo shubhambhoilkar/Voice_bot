@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Voice Bot (WhatsApp Style)</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #e5ddd5;
+        font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    .app {
+        max-width: 480px;
+        margin: 0 auto;
+        background: #efeae2;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header {
+        background: #075E54;
+        padding: 14px;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    header h2 {
+        margin: 0;
+        font-size: 20px;
+        flex: 1;
+    }
+
+    button {
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+    }
+
+    #startBtn { background: #25D366; color: white; }
+    #stopBtn {
+        background: #f0f0f0;
+        color: #333;
+        display: none;
+    }
+
+    #statusBar {
+        text-align: center;
+        font-size: 12px;
+        color: #444;
+        padding: 4px 0;
+    }
+
+    #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #e5ddd5;
+    }
+
+    /* AVATARS */
+    .row {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        max-width: 100%;
+    }
+
+    .row.user {
+        flex-direction: row-reverse;
+    }
+
+    .avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .avatar.bot {
+        background-image: url('https://cdn-icons-png.flaticon.com/512/4712/4712100.png');
+    }
+
+    .avatar.user {
+        background-image: url('https://cdn-icons-png.flaticon.com/512/3177/3177440.png');
+    }
+
+    /* BUBBLES */
+    .bubble {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.3;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.2);
+        word-break: break-word;
+    }
+
+    .bot-bubble {
+        background: white;
+        border-top-left-radius: 0;
+    }
+
+    .user-bubble {
+        background: #dcf8c6;
+        border-top-right-radius: 0;
+    }
+
+    .time {
+        font-size: 10px;
+        color: #555;
+        margin-top: 4px;
+        text-align: right;
+    }
+</style>
+</head>
+
+<body>
+<div class="app">
+
+    <header>
+        <h2>Voice Bot</h2>
+        <button id="startBtn">Start Bot</button>
+        <button id="stopBtn">Stop</button>
+    </header>
+
+    <div id="statusBar">WebSocket: disconnected</div>
+
+    <div id="chat"></div>
+
+</div>
+
+<script>
+let ws = null;
+
+const chat = document.getElementById("chat");
+const statusBar = document.getElementById("statusBar");
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+
+function nowTime() {
+    const d = new Date();
+    return d.getHours().toString().padStart(2,"0") + ":" + 
+           d.getMinutes().toString().padStart(2,"0");
+}
+
+function escapeHTML(txt) {
+    if (!txt) return "";
+    return txt.replace(/[&<>"]/g, c => ({
+        "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;"
+    }[c]));
+}
+
+function addBubble(type, text) {
+    const row = document.createElement("div");
+    row.className = "row " + type;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar " + type;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + (type === "user" ? "user-bubble" : "bot-bubble");
+    bubble.innerHTML = escapeHTML(text);
+
+    const time = document.createElement("div");
+    time.className = "time";
+    time.textContent = nowTime();
+    bubble.appendChild(time);
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    chat.appendChild(row);
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+startBtn.onclick = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+
+    const url = `ws://${location.hostname}:8000/ws`;
+    ws = new WebSocket(url);
+
+    statusBar.textContent = "WebSocket: connecting...";
+    startBtn.style.display = "none";
+    stopBtn.style.display = "inline-block";
+
+    ws.onopen = () => statusBar.textContent = "WebSocket: connected";
+    ws.onclose = () => {
+        statusBar.textContent = "WebSocket: disconnected";
+        startBtn.style.display = "inline-block";
+        stopBtn.style.display = "none";
+    };
+
+    ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+
+        if (msg.type === "user") {
+            addBubble("user", msg.text);
+        }
+        else if (msg.type === "bot") {
+            addBubble("bot", msg.text);
+        }
+        else if (msg.type === "status") {
+            statusBar.textContent = "Status: " + msg.text;
+        }
+    };
+};
+
+stopBtn.onclick = () => {
+    fetch("http://localhost:9900/stop", {method:"POST"});
+    if (ws) ws.close();
+};
+</script>
+</body>
+</html>
