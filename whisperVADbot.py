@@ -15,7 +15,7 @@ CHANNELS = 1
 BLOCK_SIZE = 512
 VAD_SILENCE_TIMEOUT = 2.0
 MIN_SEGMENT_SEC = 0.5
-API_URL = "https://localhost.sam/"
+API_URL = "localhost:/Sam_voicebot"
 
 # Smart endpointing / merging tuning
 SPEECH_END_PADDING = 0.4
