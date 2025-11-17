@@ -23,7 +23,7 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 BLOCK_SIZE = 512
 MIN_SEGMENT_SEC = 0.5
-API_URL = "https://stgbot.genieus4u.ai/chat/chatbot/"
+API_URL = "localhost://Sam_chatbot"
 
 # Smart endpointing / merging tuning
 SPEECH_END_PADDING = 0.4
@@ -697,3 +697,4 @@ if __name__ == "__main__":
     publish("status", "server_starting")
     # run without reload to avoid duplicate worker issues
     uvicorn.run("new_web_voicebotfix:app", host="0.0.0.0", port=9900, reload=False)
+
