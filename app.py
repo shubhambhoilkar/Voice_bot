@@ -21,7 +21,7 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 BLOCK_SIZE = 512
 MIN_SEGMENT_SEC = 0.5
-API_URL = "https://stgbot.genieus4u.ai/chat/chatbot/"
+API_URL = "localhost:/Sam_voicebot"
 
 # Smart endpointing / merging tuning
 SPEECH_END_PADDING = 0.4
@@ -781,3 +781,4 @@ def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+
